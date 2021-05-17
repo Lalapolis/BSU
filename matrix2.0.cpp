@@ -1,11 +1,37 @@
 #include <iostream>
+#include <vector>
+#include <typeinfo>
+
 using namespace std;
 
+double RowSum(vector<double>& row) {
+	double sum = 0;
+	for (int i = 0; i < row.size(); i++)
+	{
+		sum = sum + row[i];
+	}
+	return sum;
+}
+
+double Square(double x) {
+	return x * x;
+}
+
+double MakeNonnegative(double x) {
+	if (x < 0) {
+		return 0;
+	}
+	else {
+		return x;
+	}
+}
+
+template<class T>
 class Matrix {
 
 	int rows_;
 	int columns_;
-	double** matr;
+	T** matr;
 
 public:
 	Matrix() = delete;
@@ -13,9 +39,9 @@ public:
 	Matrix(int rows, int columns) {
 		rows_ = rows;
 		columns_ = columns;
-		matr = new double* [rows_];
+		matr = new T* [rows_];
 		for (int i = 0; i < rows_; i++) {
-			matr[i] = new double[columns_];
+			matr[i] = new T[columns_];
 		}
 
 		for (int i = 0; i < rows_; i++) {
@@ -28,9 +54,9 @@ public:
 	Matrix(const Matrix& other) {
 		rows_ = other.rows_;
 		columns_ = other.columns_;
-		matr = new double* [rows_];
+		matr = new T* [rows_];
 		for (int i = 0; i < rows_; i++) {
-			matr[i] = new double[columns_];
+			matr[i] = new T[columns_];
 		}
 
 		for (int i = 0; i < rows_; i++) {
@@ -57,10 +83,10 @@ public:
 			rows_ = other.rows_;
 			columns_ = other.columns_;
 
-			matr = new double* [rows_];
+			matr = new T* [rows_];
 			for (int i = 0; i < rows_; i++)
 			{
-				matr[i] = new double[columns_];
+				matr[i] = new T[columns_];
 			}
 
 			for (int i = 0; i < rows_; i++)
@@ -74,14 +100,14 @@ public:
 		return *this;
 	}
 
-	double& operator()(int index1, int index2) {
+	T& operator()(int index1, int index2) {
 		if ((index1 < 0) || (index2 < 0) || (index1 >= rows_) || (index2 >= columns_)) {
 			throw "Bad Index";
 		}
 		return matr[index1][index2];
 	};
 
-	const double& operator()(int index1, int index2) const {
+	const T& operator()(int index1, int index2) const {
 		if ((index1 < 0) || (index2 < 0) || (index1 >= rows_) || (index2 >= columns_)) {
 			throw "Bad Index";
 		}
@@ -137,7 +163,7 @@ public:
 		return *this;
 	};
 
-	Matrix& operator*=(const double& number) {
+	Matrix& operator*=(const T& number) {
 		for (int i = 0; i < rows_; i++)
 		{
 			for (int j = 0; j < columns_; j++)
@@ -174,12 +200,12 @@ public:
 		return !(left == right);
 	};
 
-	friend Matrix operator*(const double& number, const Matrix& matrix) {
+	friend Matrix operator*(const T& number, const Matrix& matrix) {
 		Matrix temp(matrix);
 		temp *= number;
 		return temp;
 	};
-	friend Matrix operator*(const Matrix& matrix, const double& number) {
+	friend Matrix operator*(const Matrix& matrix, const T& number) {
 		return number * matrix;
 	};
 
@@ -247,9 +273,9 @@ public:
 
 		rows_ = size;
 		columns_ = size;
-		matr = new double* [size];
+		matr = new T* [size];
 		for (int i = 0; i < size; i++) {
-			matr[i] = new double[size];
+			matr[i] = new T[size];
 		}
 
 		for (int i = 0; i < size; i++) {
@@ -263,13 +289,122 @@ public:
 			}
 		}
 		return *this;
-	};
+	}
+
+	void swaplines(int i1, int i2) {
+		for (int j = 0; j < columns_; j++)
+		{
+			swap((*this)(i1,j), (*this)(i2,j));
+		}
+	}
+
+	T Determinant() {
+		if (rows_ != columns_) cerr << "Not qudro";
+		double mul = 1;
+		Matrix x(*this);
+		for (int i = 0; i < x.rows_ - 1; i++)
+		{
+			if (!x(i,i))
+			{
+				for (int s = i;s < rows_;s++)
+					if (x(s,i))
+					{
+						x.swaplines(i, s);
+						mul *= -1;
+						break;
+					}
+			}
+			mul *= x(i,i);
+			if (mul == 0) return 0;
+			double xii = x(i,i);
+			for (int j = i; j < columns_; j++)
+			{
+				if (xii)
+					x(i,j) /= xii;
+			}
+			for (int s = i + 1; s < rows_; s++)
+			{
+				double xsi = x(s,i);
+				for (int j = i; j < columns_; j++)
+				{
+					x(s,j) -= x(i,j) * xsi;
+				}
+			}
+		}
+		mul *= x(rows_ - 1,columns_ - 1);
+		return mul;
+
+	}
+
+	friend T FindMin(const Matrix matrix) {
+		T min = matrix(0,0);
+		for (int i = 0; i < matrix.rows_; i++)
+		{
+			for (int j = 0; j < matrix.columns_; j++)
+			{
+				if (matrix(i,j) < min)
+				{
+					min = matrix(i,j);
+				}
+			}
+		}
+		return min;
+	}
+	
+	template<class Pred>
+	friend Matrix Apply(Matrix& matrix,Pred func) {
+		Matrix temp(matrix);
+		for (int i = 0; i < temp.rows_; i++)
+		{
+			for (int j = 0; j < temp.columns_; j++)
+			{
+				temp(i,j) = func(matrix(i,j));
+			}
+		}
+		return temp;
+	}
+
+	template<class Pred>
+	friend vector<T> RowwiseApply(Matrix& matrix, Pred func) {
+		vector<T> result;
+		vector<vector<T>> temp(matrix.rows_, vector<T>(matrix.columns_));
+		for (int i = 0; i < matrix.rows_; i++)
+		{
+			for (int j = 0; j < matrix.columns_; j++)
+			{
+				temp[i][j] = matrix(i, j);
+			}
+		}
+		for (int i = 0; i < matrix.rows_; i++)
+		{
+			result.push_back(func(temp[i]));
+		}
+		return result;
+	}
+
 };
 
-int main() {
-	Matrix test(1, 2);
-	Matrix test2(2, 2);
-	cout << test * test2;
-	test(0)(0) = 5;
 
+
+
+int main() {
+	Matrix<double> test(1, 2);
+	Matrix<double> test2(2, 2);
+	cout << test;	
+	test(0, 0) = 4;
+	test(0, 1) = 5;
+	cout << test << endl;
+	cout << Apply(test, Square) << endl;
+	cout << FindMin(test) << endl;
+	for (auto it: RowwiseApply(test,RowSum))
+	{
+		cout << it << endl;
+	}
+
+	test2(0, 0) = 2;
+	test2(0, 1) = 1;
+	test2(1, 0) = 1;
+	test2(1, 1) = 1;
+	cout << test << endl;
+	cout << test2.Determinant();
 }
